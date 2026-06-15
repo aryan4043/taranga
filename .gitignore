@@ -1,0 +1,37 @@
+# Dependencies
+**/node_modules
+**/npm-debug.log*
+
+# Next.js build outputs
+**/next
+**/.next/
+**/out/
+
+# Production build artifacts
+**/dist
+**/build
+
+# Environment files
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Docker volumes and logs
+docker-compose.override.yml
+*.log

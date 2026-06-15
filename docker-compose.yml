@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: taranga
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  trek-service:
+    build: ./services/trek-service
+    environment:
+      DATABASE_URL: postgres://admin:password@db:5432/taranga
+    ports:
+      - "5001:5001"
+    depends_on:
+      - db
+
+  user-service:
+    build: ./services/user-service
+    environment:
+      DATABASE_URL: postgres://admin:password@db:5432/taranga
+    ports:
+      - "5002:5002"
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_TREK_API: http://localhost:5001
+      NEXT_PUBLIC_USER_API: http://localhost:5002
+
+volumes:
+  postgres_data:
+

@@ -26,7 +26,7 @@ interface Traveler {
   totalDistance: number;
   totalAltitude: number;
   summits: number;
-  history: Trek[];
+  history?: Trek[];
 }
 
 export default function Dashboard() {
@@ -47,12 +47,11 @@ export default function Dashboard() {
   
   // Loading & service status
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState('');
   
   // Hovered trek point on the SVG chart
   const [hoveredPoint, setHoveredPoint] = useState<{ trek: Trek; x: number; y: number } | null>(null);
 
-  // Hardcoded premium fallback data if services are loading/unavailable
+  // Fallback static data if APIs are completely unavailable
   const defaultTravelers: Traveler[] = useMemo(() => [
     {
       id: 100,
@@ -69,132 +68,75 @@ export default function Dashboard() {
         { id: 3, name: 'Hampta Pass', distance: 35, altitude: 1400, date: '2025-09-05' },
         { id: 4, name: 'Beas Kund', distance: 51.5, altitude: 800, date: '2026-02-18' }
       ]
-    },
-    {
-      id: 1,
-      name: "Aarav Sharma",
-      nextDest: "Everest Base Camp",
-      date: "Oct 2026",
-      rank: "Platinum",
-      totalDistance: 820.5,
-      totalAltitude: 9400,
-      summits: 12,
-      history: [
-        { id: 11, name: 'Hampta Pass', distance: 35, altitude: 4270, date: '2024-05-10' },
-        { id: 12, name: 'Valley of Flowers', distance: 38, altitude: 3858, date: '2024-07-22' },
-        { id: 13, name: 'Goechala Trek', distance: 90, altitude: 4940, date: '2024-10-05' },
-        { id: 14, name: 'Stok Kangri Summit', distance: 45, altitude: 6153, date: '2025-08-14' }
-      ]
-    },
-    {
-      id: 2,
-      name: "Zoe Chen",
-      nextDest: "Mont Blanc Circuit",
-      date: "July 2026",
-      rank: "Gold",
-      totalDistance: 410,
-      totalAltitude: 5200,
-      summits: 6,
-      history: [
-        { id: 21, name: 'Dolomites Altavia 1', distance: 120, altitude: 3200, date: '2024-08-01' },
-        { id: 22, name: 'Tour du Mont Blanc', distance: 170, altitude: 4810, date: '2025-06-15' }
-      ]
-    },
-    {
-      id: 3,
-      name: "Marco Rossi",
-      nextDest: "Dolomites Traverse",
-      date: "Aug 2026",
-      rank: "Bronze",
-      totalDistance: 85,
-      totalAltitude: 1800,
-      summits: 2,
-      history: [
-        { id: 31, name: 'Path of the Gods', distance: 15, altitude: 650, date: '2024-09-02' },
-        { id: 32, name: 'Tour de Monte Rosa', distance: 70, altitude: 1150, date: '2025-09-20' }
-      ]
-    },
-    {
-      id: 4,
-      name: "Priya Patel",
-      nextDest: "Kanchenjunga Base",
-      date: "Nov 2026",
-      rank: "Diamond",
-      totalDistance: 1420.8,
-      totalAltitude: 16500,
-      summits: 18,
-      history: [
-        { id: 41, name: 'Annapurna Circuit', distance: 230, altitude: 5416, date: '2023-10-12' },
-        { id: 42, name: 'Markha Valley', distance: 75, altitude: 5260, date: '2024-08-05' },
-        { id: 43, name: 'Island Peak Climb', distance: 32, altitude: 6189, date: '2025-04-20' }
-      ]
     }
   ], []);
 
-  // Fetch data from Trek and User services
+  // Fetch list of travelers and load main user profile
   useEffect(() => {
-    async function fetchData() {
+    async function loadInitialData() {
       try {
-        const trekApiUrl = process.env.NEXT_PUBLIC_TREK_API || 'http://localhost:5001';
         const userApiUrl = process.env.NEXT_PUBLIC_USER_API || 'http://localhost:5002';
+        const trekApiUrl = process.env.NEXT_PUBLIC_TREK_API || 'http://localhost:5001';
+
+        // 1. Fetch all travelers from User Service
+        const travelersRes = await fetch(`${userApiUrl}/api/travelers`);
         
-        // Parallel fetches
-        const [statsRes, travelersRes] = await Promise.all([
-          fetch(`${trekApiUrl}/api/stats`).catch(() => null),
-          fetch(`${userApiUrl}/api/travelers`).catch(() => null)
-        ]);
+        if (travelersRes.ok) {
+          const list: Traveler[] = await travelersRes.json();
+          setTravelers(list);
 
-        let fetchedStats = null;
-        let fetchedTravelers = null;
-
-        if (statsRes && statsRes.ok) fetchedStats = await statsRes.json();
-        if (travelersRes && travelersRes.ok) fetchedTravelers = await travelersRes.json();
-
-        if (fetchedTravelers) {
-          // Format travelers with custom histories if missing
-          const formatted = fetchedTravelers.map((t: any) => {
-            const fallbackItem = defaultTravelers.find(dt => dt.id === t.id) || defaultTravelers[1];
-            return {
-              ...fallbackItem,
-              ...t
-            };
-          });
-          setTravelers(formatted);
-          
-          // Set user profile as active initially
-          const userProfile = defaultTravelers[0];
-          const hasUser = formatted.some((t: any) => t.id === 100);
-          if (!hasUser) {
-            setTravelers([userProfile, ...formatted]);
+          // 2. Fetch full profile and trek logs for user 100 (Default active traveler)
+          const statsRes = await fetch(`${trekApiUrl}/api/stats?userId=100`);
+          if (statsRes.ok) {
+            const userProfile = await statsRes.json();
             setActiveTraveler(userProfile);
-          } else {
-            setActiveTraveler(formatted[0]);
+          } else if (list.length > 0) {
+            // Fallback to first traveler in list if user 100 is not found
+            const firstStatsRes = await fetch(`${trekApiUrl}/api/stats?userId=${list[0].id}`);
+            if (firstStatsRes.ok) {
+              setActiveTraveler(await firstStatsRes.json());
+            } else {
+              setActiveTraveler(list[0]);
+            }
           }
         } else {
-          // Fallback to default mock data if service unavailable
+          // Fallback to static mock data if service is not ok
           setTravelers(defaultTravelers);
           setActiveTraveler(defaultTravelers[0]);
         }
-      } catch (err: any) {
-        console.error("Fetch error, using default mock data", err);
+      } catch (err) {
+        console.error("Failed to load live data, utilizing fallback", err);
         setTravelers(defaultTravelers);
         setActiveTraveler(defaultTravelers[0]);
       } finally {
         setLoading(false);
       }
     }
-    
-    fetchData();
+
+    loadInitialData();
   }, [defaultTravelers]);
 
-  // Handle selecting a traveler to view details
-  const handleSelectTraveler = (traveler: Traveler) => {
-    setActiveTraveler(traveler);
-    // Reset tooltip
+  // Handle selecting a traveler: Fetch their detailed stats & trek history dynamically
+  const handleSelectTraveler = async (traveler: Traveler) => {
+    try {
+      const trekApiUrl = process.env.NEXT_PUBLIC_TREK_API || 'http://localhost:5001';
+      const statsRes = await fetch(`${trekApiUrl}/api/stats?userId=${traveler.id}`);
+      
+      if (statsRes.ok) {
+        const detailedProfile = await statsRes.json();
+        setActiveTraveler(detailedProfile);
+      } else {
+        // Fallback to simple traveler data with empty history if API call fails
+        setActiveTraveler({ ...traveler, history: [] });
+      }
+    } catch (err) {
+      console.error(`Error loading stats for traveler ${traveler.id}:`, err);
+      setActiveTraveler({ ...traveler, history: [] });
+    }
     setHoveredPoint(null);
   };
 
-  // Gamification Rank system math
+  // Gamification Rank system target thresholds
   const getRankThresholds = (rankStr: string) => {
     switch (rankStr.toLowerCase()) {
       case 'bronze': return { current: 'Bronze', next: 'Silver', targetDistance: 150, targetAltitude: 3000 };
@@ -212,22 +154,12 @@ export default function Dashboard() {
     if (!activeTraveler) return 0;
     const distRatio = activeTraveler.totalDistance / currentThresholds.targetDistance;
     const altRatio = activeTraveler.totalAltitude / currentThresholds.targetAltitude;
-    // Average progress between the two targets
     const average = (Math.min(distRatio, 1) + Math.min(altRatio, 1)) / 2;
     return Math.round(average * 100);
   }, [activeTraveler, currentThresholds]);
 
-  // Recalculates rank based on stats
-  const calculateNewRank = (dist: number, alt: number) => {
-    if (dist >= 1200 && alt >= 15000) return 'Diamond';
-    if (dist >= 800 && alt >= 9000) return 'Platinum';
-    if (dist >= 400 && alt >= 5000) return 'Gold';
-    if (dist >= 150 && alt >= 3000) return 'Silver';
-    return 'Bronze';
-  };
-
-  // Add new trek handler (simulated dynamic update)
-  const handleRecordTrek = (e: React.FormEvent) => {
+  // Submit trek to Trek Service and update active profile statistics
+  const handleRecordTrek = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTrekName || !newTrekDistance || !newTrekAltitude || !activeTraveler) return;
 
@@ -236,40 +168,49 @@ export default function Dashboard() {
     
     if (isNaN(distVal) || isNaN(altVal)) return;
 
-    // Create new trek object
-    const newTrek: Trek = {
-      id: Date.now(),
-      name: newTrekName,
-      distance: distVal,
-      altitude: altVal,
-      date: new Date().toISOString().split('T')[0]
-    };
+    try {
+      const trekApiUrl = process.env.NEXT_PUBLIC_TREK_API || 'http://localhost:5001';
+      
+      const res = await fetch(`${trekApiUrl}/api/treks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: activeTraveler.id,
+          name: newTrekName,
+          distance: distVal,
+          altitude: altVal
+        })
+      });
 
-    // Update active traveler stats
-    const updatedHistory = [...activeTraveler.history, newTrek];
-    const newDistance = parseFloat((activeTraveler.totalDistance + distVal).toFixed(1));
-    const newAltitude = activeTraveler.totalAltitude + altVal;
-    const newSummits = activeTraveler.summits + 1;
-    const newRank = calculateNewRank(newDistance, newAltitude);
+      if (res.ok) {
+        const updatedProfile: Traveler = await res.json();
+        
+        // 1. Update active traveler state with new history and stats
+        setActiveTraveler(updatedProfile);
 
-    const updatedTraveler = {
-      ...activeTraveler,
-      totalDistance: newDistance,
-      totalAltitude: newAltitude,
-      summits: newSummits,
-      rank: newRank,
-      history: updatedHistory
-    };
+        // 2. Update stats on travelers list so marketplace cards sync
+        setTravelers(prev => prev.map(t => t.id === activeTraveler.id ? {
+          ...t,
+          totalDistance: updatedProfile.totalDistance,
+          totalAltitude: updatedProfile.totalAltitude,
+          summits: updatedProfile.summits,
+          rank: updatedProfile.rank
+        } : t));
 
-    // Update state lists
-    setTravelers(prev => prev.map(t => t.id === activeTraveler.id ? updatedTraveler : t));
-    setActiveTraveler(updatedTraveler);
-
-    // Reset fields
-    setNewTrekName('');
-    setNewTrekDistance('');
-    setNewTrekAltitude('');
-    setShowRecordModal(false);
+        // Reset inputs
+        setNewTrekName('');
+        setNewTrekDistance('');
+        setNewTrekAltitude('');
+        setShowRecordModal(false);
+      } else {
+        alert("Failed to record trek in database.");
+      }
+    } catch (err) {
+      console.error("Error submitting trek:", err);
+      alert("Error connecting to trek service database.");
+    }
   };
 
   // Search filter
@@ -278,9 +219,9 @@ export default function Dashboard() {
     t.nextDest.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // SVG Chart points calculation
+  // SVG Line Chart coordinates math
   const svgChartProps = useMemo(() => {
-    if (!activeTraveler || activeTraveler.history.length === 0) return null;
+    if (!activeTraveler || !activeTraveler.history || activeTraveler.history.length === 0) return null;
     
     const width = 680;
     const height = 180;
@@ -296,23 +237,18 @@ export default function Dashboard() {
     
     const coordinates = history.map((trek, index) => {
       const x = padding + index * xStep;
-      // Invert Y axis for SVG (0,0 is top-left)
       const y = height - padding - ((trek.altitude - minAltitude) / (maxAltitude - minAltitude)) * (height - padding * 2);
       return { x, y, trek };
     });
 
-    // Generate Path D
     let pathD = "";
     let areaD = "";
     
     if (coordinates.length > 0) {
-      // Line path
       pathD = `M ${coordinates[0].x} ${coordinates[0].y}`;
       for (let i = 1; i < coordinates.length; i++) {
         pathD += ` L ${coordinates[i].x} ${coordinates[i].y}`;
       }
-      
-      // Area path
       areaD = `${pathD} L ${coordinates[coordinates.length - 1].x} ${height - padding} L ${coordinates[0].x} ${height - padding} Z`;
     }
 
@@ -323,7 +259,7 @@ export default function Dashboard() {
     return (
       <div className="flex-center screen-center">
         <RefreshCw size={40} className="animate-spin text-emerald" />
-        <p className="loading-text">Loading Taranga Dashboard...</p>
+        <p className="loading-text">Loading Taranga Database...</p>
         <style jsx>{`
           .flex-center {
             display: flex;
@@ -484,7 +420,7 @@ export default function Dashboard() {
                       <path d={svgChartProps.pathD} stroke="url(#lineGrad)" fill="none" strokeWidth="2.5" />
                       
                       {/* Circles for Trek Peaks */}
-                      {svgChartProps.coordinates.map((pt, idx) => (
+                      {svgChartProps.coordinates.map((pt) => (
                         <circle
                           key={pt.trek.id}
                           cx={pt.x}
@@ -495,7 +431,6 @@ export default function Dashboard() {
                           strokeWidth="2"
                           style={{ cursor: 'pointer', transition: 'all 0.2s' }}
                           onMouseEnter={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect();
                             setHoveredPoint({
                               trek: pt.trek,
                               x: pt.x,
@@ -539,37 +474,39 @@ export default function Dashboard() {
               </div>
 
               {/* Complete Trek Log list */}
-              <div className="trek-history-section">
-                <h3 className="section-subtitle">Trek Logbook</h3>
-                <div className="trek-log-list">
-                  {activeTraveler.history.slice().reverse().map((t) => (
-                    <div className="trek-log-row glass" key={t.id}>
-                      <div className="log-icon-box">
-                        <MapPin size={16} className="text-emerald" />
-                      </div>
-                      <div className="log-main">
-                        <span className="log-name">{t.name}</span>
-                        <span className="log-date">{t.date}</span>
-                      </div>
-                      <div className="log-metrics">
-                        <div className="metric">
-                          <TrendingUp size={13} className="text-blue" />
-                          <span>{t.distance} km</span>
+              {activeTraveler.history && activeTraveler.history.length > 0 && (
+                <div className="trek-history-section">
+                  <h3 className="section-subtitle">Trek Logbook</h3>
+                  <div className="trek-log-list">
+                    {activeTraveler.history.slice().reverse().map((t) => (
+                      <div className="trek-log-row glass" key={t.id}>
+                        <div className="log-icon-box">
+                          <MapPin size={16} className="text-emerald" />
                         </div>
-                        <div className="metric">
-                          <Mountain size={13} className="text-emerald" />
-                          <span>{t.altitude} m</span>
+                        <div className="log-main">
+                          <span className="log-name">{t.name}</span>
+                          <span className="log-date">{t.date}</span>
+                        </div>
+                        <div className="log-metrics">
+                          <div className="metric">
+                            <TrendingUp size={13} className="text-blue" />
+                            <span>{t.distance} km</span>
+                          </div>
+                          <div className="metric">
+                            <Mountain size={13} className="text-emerald" />
+                            <span>{t.altitude} m</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </section>
 
-        {/* Right Side: Traveler Marketplace / Connections list */}
+        {/* Right Side: Traveler Marketplace */}
         <section className="side-panel">
           <div className="marketplace-header glass">
             <h2>Marketplace</h2>

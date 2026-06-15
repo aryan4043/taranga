@@ -12,14 +12,28 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-const mockTravelers = [
-  { id: 1, name: "Aarav Sharma", nextDest: "Everest Base Camp", date: "Oct 2024", rank: "Platinum" },
-  { id: 2, name: "Zoe Chen", nextDest: "Mont Blanc", date: "July 2024", rank: "Gold" },
-  { id: 3, name: "Marco Rossi", nextDest: "Dolomites", date: "Aug 2024", rank: "Bronze" }
-];
+// GET /api/travelers: Fetches all travelers in the marketplace
+app.get('/api/travelers', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM travelers ORDER BY id ASC');
+    
+    // Map database snake_case keys to frontend camelCase keys
+    const formattedTravelers = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      nextDest: row.next_dest,
+      date: row.travel_date,
+      rank: row.rank,
+      totalDistance: row.total_distance,
+      totalAltitude: row.total_altitude,
+      summits: row.summits
+    }));
 
-app.get('/api/travelers', (req, res) => {
-  res.json(mockTravelers);
+    res.json(formattedTravelers);
+  } catch (err) {
+    console.error('Error fetching travelers:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/health', (req, res) => {

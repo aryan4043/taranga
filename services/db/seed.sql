@@ -1,9 +1,9 @@
 -- Seed Users
 INSERT INTO users (id, username, email, password_hash, full_name, bio, location, rank, rank_points) VALUES
-  ('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d', 'aarav', 'aryaansingh121@gmail.com', '$2a$12$mC3B24x2W.mHw3j3h2X6/O23cO2p8H6W7vCjE8X4rD.eC8qH3w4Xy', 'Aarav Sharma', 'Avid climber and explorer of Himalayan peaks.', 'Delhi, India', 'platinum', 1200),
-  ('b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e', 'zoe', 'zoe@taranga.app', '$2a$12$mC3B24x2W.mHw3j3h2X6/O23cO2p8H6W7vCjE8X4rD.eC8qH3w4Xy', 'Zoe Chen', 'Alpine hiker, trail runner, and nature photographer.', 'Chamonix, France', 'gold', 650),
-  ('c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f', 'marco', 'marco@taranga.app', '$2a$12$mC3B24x2W.mHw3j3h2X6/O23cO2p8H6W7vCjE8X4rD.eC8qH3w4Xy', 'Marco Rossi', 'Exploring Dolomites and alpine routes since childhood.', 'Cortina, Italy', 'bronze', 90),
-  ('d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a', 'priya', 'priya@taranga.app', '$2a$12$mC3B24x2W.mHw3j3h2X6/O23cO2p8H6W7vCjE8X4rD.eC8qH3w4Xy', 'Priya Patel', 'Summit seeker, high-altitude trekker, and guide.', 'Manali, India', 'legend', 5200)
+  ('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d', 'aarav', 'aryaansingh121@gmail.com', '$2a$12$2nfk9rAJt9VqIjxc1BiI2u9KcHmEsICgkt0jQDjOwtHQUf0jWOSTq', 'Aarav Sharma', 'Avid climber and explorer of Himalayan peaks.', 'Delhi, India', 'platinum', 1200),
+  ('b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e', 'zoe', 'zoe@taranga.app', '$2a$12$2nfk9rAJt9VqIjxc1BiI2u9KcHmEsICgkt0jQDjOwtHQUf0jWOSTq', 'Zoe Chen', 'Alpine hiker, trail runner, and nature photographer.', 'Chamonix, France', 'gold', 650),
+  ('c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f', 'marco', 'marco@taranga.app', '$2a$12$2nfk9rAJt9VqIjxc1BiI2u9KcHmEsICgkt0jQDjOwtHQUf0jWOSTq', 'Marco Rossi', 'Exploring Dolomites and alpine routes since childhood.', 'Cortina, Italy', 'bronze', 90),
+  ('d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a', 'priya', 'priya@taranga.app', '$2a$12$2nfk9rAJt9VqIjxc1BiI2u9KcHmEsICgkt0jQDjOwtHQUf0jWOSTq', 'Priya Patel', 'Summit seeker, high-altitude trekker, and guide.', 'Manali, India', 'legend', 5200)
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed User Stats

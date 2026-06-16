@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import UserCard from '../components/UserCard';
 import { TrekMap, MarketplaceMap } from '../components/TrekMap';
+import Mountain3D from '../components/Mountain3D';
 import { auth, users, treks, marketplace } from '../lib/api';
 
 // TS Interfaces
@@ -785,77 +786,9 @@ export default function Dashboard() {
                 </div>
 
                 {/* 2. Elevation Profile Chart */}
-                <div className="elevation-chart-container glass">
-                  <h3 className="chart-title"><Mountain size={16} className="text-blue" /> Elevation Profile</h3>
-                  
-                  {svgChartProps ? (
-                    <div className="svg-wrapper" style={{ position: 'relative' }}>
-                      <svg viewBox={`0 0 ${svgChartProps.width} ${svgChartProps.height}`} className="elevation-svg">
-                        <defs>
-                          <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
-                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-                          </linearGradient>
-                          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stopColor="#10b981" />
-                            <stop offset="100%" stopColor="#3b82f6" />
-                          </linearGradient>
-                        </defs>
-                        <line x1="25" y1="25" x2="655" y2="25" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                        <line x1="25" y1="90" x2="655" y2="90" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                        <line x1="25" y1="155" x2="655" y2="155" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                        <path d={svgChartProps.areaD} fill="url(#chartGrad)" />
-                        <path d={svgChartProps.pathD} stroke="url(#lineGrad)" fill="none" strokeWidth="2.5" />
-                        {svgChartProps.coordinates.map((pt) => (
-                          <circle
-                            key={pt.trek.id}
-                            cx={pt.x}
-                            cy={pt.y}
-                            r={hoveredPoint?.trek.id === pt.trek.id ? 7 : 5}
-                            fill={hoveredPoint?.trek.id === pt.trek.id ? "#ffffff" : "#10b981"}
-                            stroke="#030712"
-                            strokeWidth="2"
-                            style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                            onMouseEnter={() => {
-                              setHoveredPoint({
-                                trek: pt.trek,
-                                x: pt.x,
-                                y: pt.y - 10
-                              });
-                            }}
-                            onMouseLeave={() => setHoveredPoint(null)}
-                          />
-                        ))}
-                      </svg>
-
-                      {/* Tooltip */}
-                      <AnimatePresence>
-                        {hoveredPoint && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="chart-tooltip glass"
-                            style={{
-                              position: 'absolute',
-                              left: `${(hoveredPoint.x / 680) * 100}%`,
-                              bottom: `${((180 - hoveredPoint.y) / 180) * 100 + 4}%`,
-                              transform: 'translateX(-50%)',
-                              pointerEvents: 'none'
-                            }}
-                          >
-                            <h4>{hoveredPoint.trek.title}</h4>
-                            <div className="tooltip-details">
-                              <div><span>Max Alt:</span> <strong>{hoveredPoint.trek.max_altitude_m} m</strong></div>
-                              <div><span>Distance:</span> <strong>{hoveredPoint.trek.distance_km} km</strong></div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  ) : (
-                    <div className="empty-chart">No trek logs found. Record a trek to populate!</div>
-                  )}
+                <div className="elevation-chart-container glass" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <h3 className="chart-title" style={{ marginBottom: '12px' }}><Mountain size={16} className="text-blue" /> Elevation Profile</h3>
+                  <Mountain3D activeTrek={activeTrek} height="320px" />
                 </div>
               </div>
 

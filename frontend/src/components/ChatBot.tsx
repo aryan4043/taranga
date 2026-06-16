@@ -15,31 +15,63 @@ interface Message {
 
 const getBotResponse = (input: string): string => {
   const text = input.toLowerCase()
-  if (text.includes('hello') || text.includes('hi') || text.includes('hey') || text.includes('namaste')) {
-    return "Namaste! I'm Sherpa AI, your Taranga trekking guide. How can I help you explore the trails today? 🏔️"
+  
+  // 1. High Priority Specific Locations
+  if (text.includes('hampta')) {
+    return "The Hampta Pass Route (4,270m) is a classic 35 km Indian trek transitioning from green valleys to high-pass snow desert landscapes. Safety tips: carry microspikes for crossing the snow bridges, acclimatize properly, pack a windproof outer shell, and watch out for river crossings! ❄️"
   }
+  if (text.includes('kedarkantha')) {
+    return "The Kedarkantha Peak Climb is a popular 20 km winter trek in India reaching 3,810m. Safety tips: wear gaiters to keep snow out of your boots, use trekking poles, pack thermals, and start your summit climb around 3:00 AM to catch the sunrise safely! 🏔️"
+  }
+  if (text.includes('everest') || text.includes('ebc')) {
+    return "The Everest Base Camp Expedition in Nepal reaches 5,364m. Safety tips: acclimatize slowly in Namche Bazaar, drink 4 liters of water daily, carry Diamox for AMS, dress in layered fleece/down, and watch for yak caravans on narrow paths! 🏔️"
+  }
+  if (text.includes('mont blanc') || text.includes('tmb')) {
+    return "The Tour du Mont Blanc is a 170 km classic alpine circuit crossing France, Italy, and Switzerland. Safety tips: book refuges 6-9 months early, check high-altitude weather for pass crossings, stay on marked trails, and carry a basic map. ⛺"
+  }
+
+  // 2. Medium Priority Safety and Health
+  if (text.includes('safety') || text.includes('prepare') || text.includes('preparation') || text.includes('tip')) {
+    return "Safety first! Always check weather reports before ascending, carry a fully stocked first-aid kit, wear layer-appropriate clothing, stay hydrated, carry energy snacks, and ensure you have high-altitude offline maps loaded before leaving. 🎒"
+  }
+  if (text.includes('altitude') || text.includes('ams') || text.includes('sickness') || text.includes('dizzy') || text.includes('nausea')) {
+    return "Acute Mountain Sickness (AMS) can start above 2,500m. Acclimatize slowly (limit gain to 500m/day), drink plenty of fluids, eat carbs, and carry Diamox. If you feel dizzy, nauseous, or have a severe headache, descend immediately! ⚕️"
+  }
+  if (text.includes('weather') || text.includes('rain') || text.includes('storm') || text.includes('snow') || text.includes('forecast')) {
+    return "High-altitude weather changes fast! Check local forecasts daily. Always pack a waterproof outer shell, storm-proof your pack, and start your climbs early in the morning to avoid afternoon storm build-ups. ⛈️"
+  }
+
+  // 3. Medium Priority Gear and Food
+  if (text.includes('gear') || text.includes('shoe') || text.includes('clothing') || text.includes('backpack') || text.includes('equipment') || text.includes('jacket')) {
+    return "Essential gear includes: a 40-60L backpack, broken-in waterproof hiking boots, thermal layers (wool/synthetic), wind/rain jackets, headlamp, first-aid kit, water filter, and trekking poles! 🎒"
+  }
+  if (text.includes('food') || text.includes('water') || text.includes('snack') || text.includes('drink') || text.includes('eat')) {
+    return "Trekking burns 4,000+ calories/day. Carry high-calorie snacks (dry fruits, energy bars, chocolates). Purify natural stream water using chlorine dioxide tablets, UV filters, or active squeeze filters! 💧"
+  }
+
+  // 4. Low Priority App Context
   if (text.includes('aarav') || text.includes('aryan') || text.includes('aryaansingh121')) {
     return "Aarav Sharma is a Platinum-ranked trekker on Taranga with 1,200 points. You can connect with him at aryaansingh121@gmail.com! ✉️"
   }
-  if (text.includes('rank') || text.includes('points') || text.includes('level') || text.includes('bronze') || text.includes('gold') || text.includes('platinum')) {
+  if (text.includes('rank') || text.includes('points') || text.includes('level') || text.includes('bronze') || text.includes('gold') || text.includes('platinum') || text.includes('legend')) {
     return "Taranga has 5 rank tiers: Bronze, Silver, Gold, Platinum, and Legend. You earn rank points by logging completed treks, which showcase your total distance and elevation gain! 🏆"
   }
-  if (text.includes('trek') || text.includes('route') || text.includes('hike') || text.includes('climb')) {
-    return "We have several amazing treks seeded, including the 'Kedarkantha Peak Climb' (3,810m) and the 'Hampta Pass Route' (4,270m). Check the Map view on your dashboard to see details! 🗺️"
-  }
-  if (text.includes('map') || text.includes('google') || text.includes('search')) {
+  if (text.includes('map') || text.includes('google') || text.includes('search') || text.includes('navigate')) {
     return "You can search any location on our maps using the Search Bar in the top-left corner of the map. If you don't have a Google Maps key set, it defaults to a beautiful dark-mode Leaflet Map! 🌐"
   }
   if (text.includes('connect') || text.includes('email') || text.includes('mailto') || text.includes('talk')) {
     return "To connect with a trekker, simply click 'Connect' on their explorer card. This triggers a pre-filled email client to send them a message directly! 🤝"
   }
-  if (text.includes('safety') || text.includes('gear') || text.includes('tips') || text.includes('preparation')) {
-    return "Safety first! Always check avalanche/weather reports, carry a first-aid kit, wear layer-appropriate clothing, and ensure you have high-altitude offline maps loaded before ascending. 🎒"
-  }
   if (text.includes('marketplace') || text.includes('trip') || text.includes('join') || text.includes('group')) {
     return "The Marketplace lists active group climbs (e.g. Everest Base Camp Expedition). You can express interest by typing a message to the trip creator directly from the marketplace tab! ⛺"
   }
-  return "That sounds like a great adventure! I'm here to help you navigate Taranga. You can ask me about treks, safety tips, ranks, or how to search locations on the map! ⛰️"
+
+  // 5. Conversational / Generic fallback
+  if (text.includes('hello') || text.includes('hi') || text.includes('hey') || text.includes('namaste')) {
+    return "Namaste! I'm Sherpa AI, your Taranga trekking guide. How can I help you explore the trails today? 🏔️"
+  }
+  
+  return "That sounds like a great adventure! I'm here to help you navigate Taranga. You can ask me about treks (like Hampta or Kedarkantha), safety tips, altitude sickness, gear preparation, or maps! ⛰️"
 }
 
 export default function ChatBot() {

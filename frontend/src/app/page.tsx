@@ -517,7 +517,7 @@ export default function Dashboard() {
           </form>
 
           <div className="demo-banner glass">
-            <span>💡 <strong>Quick Demo Login:</strong> aarav@taranga.app / password123</span>
+            <span>💡 <strong>Quick Demo Login:</strong> aryaansingh121@gmail.com / password123</span>
           </div>
         </div>
 

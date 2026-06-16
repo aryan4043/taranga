@@ -14,6 +14,7 @@ interface TravelerProps {
   summits?: number;
   isSelected?: boolean;
   onSelect?: () => void;
+  email?: string;
 }
 
 export default function UserCard({
@@ -25,7 +26,8 @@ export default function UserCard({
   totalAltitude = 3200,
   summits = 3,
   isSelected = false,
-  onSelect
+  onSelect,
+  email
 }: TravelerProps) {
   const [connectStatus, setConnectStatus] = useState<'Connect' | 'Requested' | 'Connected'>('Connect');
 
@@ -50,6 +52,8 @@ export default function UserCard({
     e.stopPropagation(); // Avoid triggering card selection
     if (connectStatus === 'Connect') {
       setConnectStatus('Requested');
+      const targetEmail = email || 'aryaansingh121@gmail.com';
+      window.location.href = `mailto:${targetEmail}?subject=Connection Request on Taranga&body=Hi ${name},\n\nI saw your profile on Taranga and would love to connect and talk about trekking!`;
     } else if (connectStatus === 'Requested') {
       setConnectStatus('Connected');
     } else {

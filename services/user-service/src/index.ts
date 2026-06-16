@@ -74,7 +74,7 @@ app.post('/api/users/login', async (req, res) => {
 // ── GET PROFILE ──────────────────────────────────────────────
 app.get('/api/users/profile/:username', async (req, res) => {
   const { rows: [user] } = await pool.query(
-    `SELECT u.id, u.username, u.full_name, u.bio, u.avatar_url, u.location,
+    `SELECT u.id, u.username, u.email, u.full_name, u.bio, u.avatar_url, u.location,
             u.rank, u.rank_points, u.created_at,
             s.total_distance_km, s.total_elevation_m, s.total_treks,
             s.highest_altitude_m, s.total_countries
@@ -154,7 +154,7 @@ app.get('/api/users/:id/following', async (req, res) => {
 app.get('/api/users/search', async (req, res) => {
   const { q = '', rank, limit = '20' } = req.query as Record<string, string>
   const { rows } = await pool.query(
-    `SELECT u.id, u.username, u.full_name, u.avatar_url, u.rank, u.location,
+    `SELECT u.id, u.username, u.full_name, u.avatar_url, u.rank, u.location, u.email,
             s.total_distance_km, s.total_treks
      FROM users u LEFT JOIN user_stats s ON s.user_id = u.id
      WHERE (u.username ILIKE $1 OR u.full_name ILIKE $1)

@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import UserCard from '../components/UserCard';
 import { TrekMap, MarketplaceMap } from '../components/TrekMap';
 import Mountain3D from '../components/Mountain3D';
+import ChatBot from '../components/ChatBot';
 import { auth, users, treks, marketplace } from '../lib/api';
 
 // TS Interfaces
@@ -644,6 +645,7 @@ export default function Dashboard() {
             text-align: center;
           }
         `}</style>
+        <ChatBot />
       </div>
     );
   }
@@ -1666,6 +1668,7 @@ export default function Dashboard() {
         .text-amber { color: var(--accent-amber); }
         .text-dark { color: var(--text-dark); }
       `}</style>
+      <ChatBot />
     </div>
   );
 }

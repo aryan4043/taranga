@@ -1,10 +1,9 @@
 // frontend/src/components/TrekMap.tsx
-// Google Maps component — shows trek route, start/end pins, and marketplace pins
-// Requires: npm install @react-google-maps/api
+// Maps component — supports Google Maps (with key) and Leaflet/OSM fallback (without key)
 
 'use client'
-import { useCallback, useRef } from 'react'
-import { GoogleMap, useJsApiLoader, Marker, Polyline, InfoWindow } from '@react-google-maps/api'
+import { useCallback, useRef, useEffect, useState } from 'react'
+import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/api'
 
 const MAPS_KEY = process.env.NEXT_PUBLIC_MAPS_KEY || ''
 
@@ -15,7 +14,6 @@ const MAP_STYLES = [
   { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#1f2e1f' }] },
 ]
 
-// ── Trek Route Map ────────────────────────────────────────────
 interface Waypoint { lat: number; lng: number; altitude_m?: number }
 
 interface TrekMapProps {
@@ -27,12 +25,111 @@ interface TrekMapProps {
   height?: string
 }
 
-export function TrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = [], height = '400px' }: TrekMapProps) {
+// ── Leaflet Dynamic Loader ───────────────────────────────────
+const loadLeaflet = (callback: () => void) => {
+  if (typeof window === 'undefined') return
+  if ((window as any).L) {
+    callback()
+    return
+  }
+
+  if (document.getElementById('leaflet-css')) {
+    const checkInterval = setInterval(() => {
+      if ((window as any).L) {
+        clearInterval(checkInterval)
+        callback()
+      }
+    }, 100)
+    return
+  }
+
+  // Load CSS
+  const link = document.createElement('link')
+  link.id = 'leaflet-css'
+  link.rel = 'stylesheet'
+  link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+  document.head.appendChild(link)
+
+  // Load JS
+  const script = document.createElement('script')
+  script.id = 'leaflet-js'
+  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+  script.onload = () => callback()
+  document.body.appendChild(script)
+}
+
+// ── Leaflet Fallback Component ──────────────────────────────
+function LeafletTrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = [], height = '400px' }: TrekMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const [leafletLoaded, setLeafletLoaded] = useState(false)
+
+  useEffect(() => {
+    loadLeaflet(() => setLeafletLoaded(true))
+  }, [])
+
+  useEffect(() => {
+    if (!leafletLoaded || !mapRef.current) return
+
+    const L = (window as any).L
+    const centerLat = start_lat || 28.5
+    const centerLng = start_lng || 84.1
+
+    const map = L.map(mapRef.current).setView([centerLat, centerLng], waypoints.length > 0 ? 11 : 8)
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }).addTo(map)
+
+    const pathCoords = waypoints.length > 0
+      ? waypoints.map(w => [Number(w.lat), Number(w.lng)])
+      : [
+          ...(start_lat && start_lng ? [[Number(start_lat), Number(start_lng)]] : []),
+          ...(end_lat && end_lng     ? [[Number(end_lat),   Number(end_lng)  ]] : []),
+        ]
+
+    if (pathCoords.length > 1) {
+      L.polyline(pathCoords, { color: '#f59e0b', weight: 4, opacity: 0.9 }).addTo(map)
+      const bounds = L.latLngBounds(pathCoords)
+      map.fitBounds(bounds)
+    }
+
+    const startIcon = L.divIcon({
+      html: '<div style="background-color: #10b981; color: white; font-weight: bold; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3)">S</div>',
+      className: '',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    })
+
+    const endIcon = L.divIcon({
+      html: '<div style="background-color: #ef4444; color: white; font-weight: bold; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3)">E</div>',
+      className: '',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    })
+
+    if (start_lat && start_lng) {
+      L.marker([Number(start_lat), Number(start_lng)], { icon: startIcon }).addTo(map).bindPopup('Start')
+    }
+
+    if (end_lat && end_lng) {
+      L.marker([Number(end_lat), Number(end_lng)], { icon: endIcon }).addTo(map).bindPopup('End')
+    }
+
+    return () => {
+      map.remove()
+    }
+  }, [leafletLoaded, start_lat, start_lng, end_lat, end_lng, waypoints])
+
+  return <div ref={mapRef} style={{ width: '100%', height, borderRadius: 12, border: '1px solid #374151', zIndex: 1 }} />
+}
+
+// ── Google Trek Map Component ──────────────────────────────
+function GoogleTrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = [], height = '400px' }: TrekMapProps) {
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: MAPS_KEY })
 
   const center = start_lat && start_lng
-    ? { lat: start_lat, lng: start_lng }
-    : { lat: 28.5, lng: 84.1 }  // default: Nepal
+    ? { lat: Number(start_lat), lng: Number(start_lng) }
+    : { lat: 28.5, lng: 84.1 }
 
   const path = waypoints.length > 0
     ? waypoints.map(w => ({ lat: Number(w.lat), lng: Number(w.lng) }))
@@ -41,26 +138,21 @@ export function TrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = []
         ...(end_lat && end_lng     ? [{ lat: Number(end_lat),   lng: Number(end_lng)   }] : []),
       ]
 
-  if (!isLoaded) return (
-    <div style={{ height, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', borderRadius: 12 }}>
-      Loading map…
-    </div>
-  )
-
-  if (!MAPS_KEY) return (
-    <div style={{ height, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', borderRadius: 12, fontSize: 14, textAlign: 'center', padding: 16 }}>
-      ⚠️ Set NEXT_PUBLIC_MAPS_KEY in your .env to enable maps
-    </div>
-  )
+  if (!isLoaded) {
+    return (
+      <div style={{ height, background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', borderRadius: 12 }}>
+        Loading Google Map…
+      </div>
+    )
+  }
 
   return (
     <GoogleMap
       mapContainerStyle={{ width: '100%', height, borderRadius: 12 }}
       center={center}
       zoom={waypoints.length > 0 ? 11 : 8}
-      options={{ styles: MAP_STYLES, mapTypeId: 'terrain', disableDefaultUI: false }}
+      options={{ styles: MAP_STYLES, mapTypeId: 'terrain' }}
     >
-      {/* Route polyline */}
       {path.length > 1 && (
         <Polyline
           path={path}
@@ -68,28 +160,33 @@ export function TrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = []
         />
       )}
 
-      {/* Start marker */}
       {start_lat && start_lng && (
         <Marker
           position={{ lat: Number(start_lat), lng: Number(start_lng) }}
           label={{ text: 'S', color: '#fff', fontWeight: 'bold', fontSize: '12px' }}
-          title="Start"
         />
       )}
 
-      {/* End marker */}
       {end_lat && end_lng && (
         <Marker
           position={{ lat: Number(end_lat), lng: Number(end_lng) }}
           label={{ text: 'E', color: '#fff', fontWeight: 'bold', fontSize: '12px' }}
-          title="End"
         />
       )}
     </GoogleMap>
   )
 }
 
-// ── Marketplace Map — shows all active listings as pins ──────
+// ── EXPORTED TREK MAP (Adaptive switcher) ───────────────────
+export function TrekMap(props: TrekMapProps) {
+  if (!MAPS_KEY) {
+    return <LeafletTrekMap {...props} />
+  }
+  return <GoogleTrekMap {...props} />
+}
+
+
+// ── Marketplace Map Interfaces ──────────────────────────────
 interface ListingPin {
   id: string
   title: string
@@ -110,7 +207,76 @@ const RANK_COLORS: Record<string, string> = {
   platinum: '#E5E4E2', legend: '#9B59B6'
 }
 
-export function MarketplaceMap({ listings, onSelectListing, height = '500px' }: MarketplaceMapProps) {
+// ── Leaflet Marketplace Map ──────────────────────────────────
+function LeafletMarketplaceMap({ listings, onSelectListing, height = '500px' }: MarketplaceMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const [leafletLoaded, setLeafletLoaded] = useState(false)
+
+  useEffect(() => {
+    loadLeaflet(() => setLeafletLoaded(true))
+  }, [])
+
+  useEffect(() => {
+    if (!leafletLoaded || !mapRef.current) return
+
+    const L = (window as any).L
+    const validListings = listings.filter(l => l.dest_lat && l.dest_lng)
+
+    const centerLat = validListings.length > 0 ? Number(validListings[0].dest_lat) : 28.5
+    const centerLng = validListings.length > 0 ? Number(validListings[0].dest_lng) : 84.1
+
+    const map = L.map(mapRef.current).setView([centerLat, centerLng], 4)
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }).addTo(map)
+
+    const markerGroup = L.featureGroup()
+
+    validListings.forEach(listing => {
+      const color = RANK_COLORS[listing.creator_rank] || '#888'
+      
+      const pinIcon = L.divIcon({
+        html: `<div style="background-color: ${color}; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px ${color}"></div>`,
+        className: '',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      })
+
+      const marker = L.marker([Number(listing.dest_lat), Number(listing.dest_lng)], { icon: pinIcon })
+        .addTo(map)
+        .bindPopup(`
+          <div style="color: #111; font-family: sans-serif;">
+            <b style="font-size: 13px;">${listing.title}</b><br/>
+            <span style="color: #666; font-size: 11px;">${listing.destination}</span><br/>
+            <button id="btn-${listing.id}" style="margin-top: 8px; background: #3b82f6; border: none; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold; width: 100%;">View Details</button>
+          </div>
+        `)
+
+      marker.on('popupopen', () => {
+        const button = document.getElementById(`btn-${listing.id}`)
+        if (button) {
+          button.onclick = () => onSelectListing?.(listing.id)
+        }
+      })
+
+      marker.addTo(markerGroup)
+    })
+
+    if (validListings.length > 0) {
+      map.fitBounds(markerGroup.getBounds().pad(0.1))
+    }
+
+    return () => {
+      map.remove()
+    }
+  }, [leafletLoaded, listings])
+
+  return <div ref={mapRef} style={{ width: '100%', height, borderRadius: 12, border: '1px solid #374151', zIndex: 1 }} />
+}
+
+// ── Google Marketplace Map ───────────────────────────────────
+function GoogleMarketplaceMap({ listings, onSelectListing, height = '500px' }: MarketplaceMapProps) {
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: MAPS_KEY })
   const mapRef = useRef<google.maps.Map | null>(null)
 
@@ -120,17 +286,13 @@ export function MarketplaceMap({ listings, onSelectListing, height = '500px' }: 
     ? { lat: Number(validListings[0].dest_lat), lng: Number(validListings[0].dest_lng) }
     : { lat: 28.5, lng: 84.1 }
 
-  if (!isLoaded) return (
-    <div style={{ height, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', borderRadius: 12 }}>
-      Loading map…
-    </div>
-  )
-
-  if (!MAPS_KEY) return (
-    <div style={{ height, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', borderRadius: 12, fontSize: 14, textAlign: 'center', padding: 16 }}>
-      ⚠️ Set NEXT_PUBLIC_MAPS_KEY in your .env to enable maps
-    </div>
-  )
+  if (!isLoaded) {
+    return (
+      <div style={{ height, background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', borderRadius: 12 }}>
+        Loading Google Map…
+      </div>
+    )
+  }
 
   return (
     <GoogleMap
@@ -158,4 +320,12 @@ export function MarketplaceMap({ listings, onSelectListing, height = '500px' }: 
       ))}
     </GoogleMap>
   )
+}
+
+// ── EXPORTED MARKETPLACE MAP (Adaptive switcher) ─────────────
+export function MarketplaceMap(props: MarketplaceMapProps) {
+  if (!MAPS_KEY) {
+    return <LeafletMarketplaceMap {...props} />
+  }
+  return <GoogleMarketplaceMap {...props} />
 }

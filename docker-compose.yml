@@ -65,6 +65,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-password}@db:5432/taranga
       JWT_SECRET: ${JWT_SECRET:-changeme_secret_32chars_minimum}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       PORT: 5002
     ports:
       - "5002:5002"

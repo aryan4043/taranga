@@ -76,12 +76,46 @@ export default function ChatBot() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
 
+    // Capture the current history before updating state
+    const currentHistory = [...messages, userMsg]
     setMessages(prev => [...prev, userMsg])
     setInputVal('')
     setIsTyping(true)
 
-    // Simulate typing delay
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/users/chatbot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: userMsg.text,
+          history: currentHistory
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const botMsg: Message = {
+          id: Math.random().toString(),
+          sender: 'bot',
+          text: data.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+        setMessages(prev => [...prev, botMsg])
+      } else {
+        // Fallback to local rule-based responses if backend fails or API key is missing
+        const responseText = getBotResponse(userMsg.text)
+        const botMsg: Message = {
+          id: Math.random().toString(),
+          sender: 'bot',
+          text: responseText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+        setMessages(prev => [...prev, botMsg])
+      }
+    } catch (err) {
+      // Fallback on network errors
       const responseText = getBotResponse(userMsg.text)
       const botMsg: Message = {
         id: Math.random().toString(),
@@ -90,8 +124,9 @@ export default function ChatBot() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
       setMessages(prev => [...prev, botMsg])
+    } finally {
       setIsTyping(false)
-    }, 1200)
+    }
   }
 
   return (

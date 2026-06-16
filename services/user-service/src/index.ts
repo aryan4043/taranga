@@ -216,5 +216,66 @@ app.post('/api/marketplace/:id/interest', auth, async (req: AuthRequest, res) =>
   res.status(204).send()
 })
 
+// ── CHATBOT: GEMINI API PROXY ────────────────────────────────
+app.post('/api/users/chatbot', async (req, res) => {
+  const { message, history } = req.body
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+
+  if (!GEMINI_API_KEY) {
+    return res.status(400).json({ error: 'Gemini API Key is not configured' })
+  }
+
+  try {
+    const contents: any[] = []
+    
+    if (Array.isArray(history)) {
+      // Limit context window to last 10 messages to keep request payload compact
+      const recentHistory = history.slice(-10)
+      recentHistory.forEach((h: any) => {
+        // Skip fallback/welcome messages that don't match Gemini schema structure
+        if (h.id === 'welcome') return
+        contents.push({
+          role: h.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: h.text }]
+        })
+      })
+    }
+    
+    contents.push({
+      role: 'user',
+      parts: [{ text: message }]
+    })
+
+    const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents,
+        systemInstruction: {
+          parts: [{
+            text: "You are Sherpa AI, a helpful, friendly, and expert trekking assistant for Taranga. Taranga is a social trekking app where users can track climbs, view elevation profiles (with interactive 3D mountain maps), rank up (Bronze, Silver, Gold, Platinum, Legend) by completing hikes, connect with other trekkers (via mailto links), and post group climbs on the marketplace. Speak like a knowledgeable sherpa guide, use markdown in your responses, and offer practical climbing advice."
+          }]
+        }
+      })
+    })
+
+    if (!apiRes.ok) {
+      const errText = await apiRes.text()
+      console.error("Gemini API call failed:", errText)
+      return res.status(502).json({ error: 'Failed to communicate with AI service' })
+    }
+
+    const data: any = await apiRes.json()
+    const botReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't process that response."
+    
+    res.json({ reply: botReply })
+  } catch (err: any) {
+    console.error("Chatbot endpoint error:", err)
+    res.status(500).json({ error: 'Chatbot endpoint failed' })
+  }
+})
+
 const PORT = parseInt(process.env.PORT || '5002')
 app.listen(PORT, () => console.log(`User service running on :${PORT}`))

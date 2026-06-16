@@ -1,8 +1,8 @@
 // frontend/src/lib/api.ts
 // Typed API client — replaces all mock/static data in your UI
 
-const TREK_API = process.env.NEXT_PUBLIC_TREK_API || 'http://localhost:5001'
-const USER_API = process.env.NEXT_PUBLIC_USER_API || 'http://localhost:5002'
+const TREK_API = ''
+const USER_API = ''
 
 const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('token') : null
 

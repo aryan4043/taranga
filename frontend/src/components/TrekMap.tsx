@@ -1,5 +1,5 @@
 // frontend/src/components/TrekMap.tsx
-// Maps component — supports Google Maps (with key) and Leaflet/OSM fallback (without key)
+// Maps component — supports Google Maps and Leaflet fallback with a location search bar
 
 'use client'
 import { useCallback, useRef, useEffect, useState } from 'react'
@@ -58,9 +58,118 @@ const loadLeaflet = (callback: () => void) => {
   document.body.appendChild(script)
 }
 
+// ── Map Search overlay UI component ─────────────────────────
+interface SearchOverlayProps {
+  onSearch: (lat: number, lng: number) => void
+}
+
+function SearchOverlay({ onSearch }: SearchOverlayProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchError, setSearchError] = useState('')
+  const [searching, setSearching] = useState(false)
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return
+    setSearching(true)
+    setSearchError('')
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`)
+      const data = await res.json()
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat)
+        const lng = parseFloat(data[0].lon)
+        onSearch(lat, lng)
+      } else {
+        setSearchError('Location not found')
+        setTimeout(() => setSearchError(''), 3000)
+      }
+    } catch (err) {
+      setSearchError('Search failed')
+      setTimeout(() => setSearchError(''), 3000)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: '12px',
+      left: '12px',
+      zIndex: 1000,
+      width: '280px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px'
+    }}>
+      <div style={{
+        display: 'flex',
+        gap: '6px',
+        background: 'rgba(17, 24, 39, 0.9)',
+        backdropFilter: 'blur(8px)',
+        padding: '6px',
+        borderRadius: '8px',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+      }}>
+        <input
+          type="text"
+          placeholder="🔍 Search location..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+          style={{
+            flex: 1,
+            background: '#1f2937',
+            border: '1px solid #374151',
+            color: '#fff',
+            padding: '6px 10px',
+            borderRadius: '6px',
+            fontSize: '13px',
+            outline: 'none'
+          }}
+        />
+        <button
+          onClick={handleSearch}
+          disabled={searching}
+          style={{
+            background: '#3b82f6',
+            color: '#fff',
+            border: 'none',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'background 0.2s'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = '#2563eb'}
+          onMouseOut={(e) => e.currentTarget.style.background = '#3b82f6'}
+        >
+          {searching ? '...' : 'Go'}
+        </button>
+      </div>
+      {searchError && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.9)',
+          color: '#fff',
+          fontSize: '11px',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          width: 'max-content',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+        }}>
+          {searchError}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Leaflet Fallback Component ──────────────────────────────
 function LeafletTrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = [], height = '400px' }: TrekMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
+  const [mapInstance, setMapInstance] = useState<any>(null)
   const [leafletLoaded, setLeafletLoaded] = useState(false)
 
   useEffect(() => {
@@ -115,17 +224,32 @@ function LeafletTrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = []
       L.marker([Number(end_lat), Number(end_lng)], { icon: endIcon }).addTo(map).bindPopup('End')
     }
 
+    setMapInstance(map)
+
     return () => {
       map.remove()
+      setMapInstance(null)
     }
   }, [leafletLoaded, start_lat, start_lng, end_lat, end_lng, waypoints])
 
-  return <div ref={mapRef} style={{ width: '100%', height, borderRadius: 12, border: '1px solid #374151', zIndex: 1 }} />
+  const handleSearchLoc = (lat: number, lng: number) => {
+    if (mapInstance) {
+      mapInstance.setView([lat, lng], 13)
+    }
+  }
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height }}>
+      <SearchOverlay onSearch={handleSearchLoc} />
+      <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 12, border: '1px solid #374151', zIndex: 1 }} />
+    </div>
+  )
 }
 
 // ── Google Trek Map Component ──────────────────────────────
 function GoogleTrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = [], height = '400px' }: TrekMapProps) {
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: MAPS_KEY })
+  const mapRef = useRef<google.maps.Map | null>(null)
 
   const center = start_lat && start_lng
     ? { lat: Number(start_lat), lng: Number(start_lng) }
@@ -146,34 +270,45 @@ function GoogleTrekMap({ start_lat, start_lng, end_lat, end_lng, waypoints = [],
     )
   }
 
+  const handleSearchLoc = (lat: number, lng: number) => {
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat, lng })
+      mapRef.current.setZoom(13)
+    }
+  }
+
   return (
-    <GoogleMap
-      mapContainerStyle={{ width: '100%', height, borderRadius: 12 }}
-      center={center}
-      zoom={waypoints.length > 0 ? 11 : 8}
-      options={{ styles: MAP_STYLES, mapTypeId: 'terrain' }}
-    >
-      {path.length > 1 && (
-        <Polyline
-          path={path}
-          options={{ strokeColor: '#f59e0b', strokeOpacity: 0.9, strokeWeight: 3 }}
-        />
-      )}
+    <div style={{ position: 'relative', width: '100%', height }}>
+      <SearchOverlay onSearch={handleSearchLoc} />
+      <GoogleMap
+        mapContainerStyle={{ width: '100%', height: '100%', borderRadius: 12 }}
+        center={center}
+        zoom={waypoints.length > 0 ? 11 : 8}
+        options={{ styles: MAP_STYLES, mapTypeId: 'terrain' }}
+        onLoad={map => { mapRef.current = map }}
+      >
+        {path.length > 1 && (
+          <Polyline
+            path={path}
+            options={{ strokeColor: '#f59e0b', strokeOpacity: 0.9, strokeWeight: 3 }}
+          />
+        )}
 
-      {start_lat && start_lng && (
-        <Marker
-          position={{ lat: Number(start_lat), lng: Number(start_lng) }}
-          label={{ text: 'S', color: '#fff', fontWeight: 'bold', fontSize: '12px' }}
-        />
-      )}
+        {start_lat && start_lng && (
+          <Marker
+            position={{ lat: Number(start_lat), lng: Number(start_lng) }}
+            label={{ text: 'S', color: '#fff', fontWeight: 'bold', fontSize: '12px' }}
+          />
+        )}
 
-      {end_lat && end_lng && (
-        <Marker
-          position={{ lat: Number(end_lat), lng: Number(end_lng) }}
-          label={{ text: 'E', color: '#fff', fontWeight: 'bold', fontSize: '12px' }}
-        />
-      )}
-    </GoogleMap>
+        {end_lat && end_lng && (
+          <Marker
+            position={{ lat: Number(end_lat), lng: Number(end_lng) }}
+            label={{ text: 'E', color: '#fff', fontWeight: 'bold', fontSize: '12px' }}
+          />
+        )}
+      </GoogleMap>
+    </div>
   )
 }
 
@@ -210,6 +345,7 @@ const RANK_COLORS: Record<string, string> = {
 // ── Leaflet Marketplace Map ──────────────────────────────────
 function LeafletMarketplaceMap({ listings, onSelectListing, height = '500px' }: MarketplaceMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
+  const [mapInstance, setMapInstance] = useState<any>(null)
   const [leafletLoaded, setLeafletLoaded] = useState(false)
 
   useEffect(() => {
@@ -267,12 +403,26 @@ function LeafletMarketplaceMap({ listings, onSelectListing, height = '500px' }: 
       map.fitBounds(markerGroup.getBounds().pad(0.1))
     }
 
+    setMapInstance(map)
+
     return () => {
       map.remove()
+      setMapInstance(null)
     }
   }, [leafletLoaded, listings])
 
-  return <div ref={mapRef} style={{ width: '100%', height, borderRadius: 12, border: '1px solid #374151', zIndex: 1 }} />
+  const handleSearchLoc = (lat: number, lng: number) => {
+    if (mapInstance) {
+      mapInstance.setView([lat, lng], 11)
+    }
+  }
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height }}>
+      <SearchOverlay onSearch={handleSearchLoc} />
+      <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 12, border: '1px solid #374151', zIndex: 1 }} />
+    </div>
+  )
 }
 
 // ── Google Marketplace Map ───────────────────────────────────
@@ -294,31 +444,41 @@ function GoogleMarketplaceMap({ listings, onSelectListing, height = '500px' }: M
     )
   }
 
+  const handleSearchLoc = (lat: number, lng: number) => {
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat, lng })
+      mapRef.current.setZoom(11)
+    }
+  }
+
   return (
-    <GoogleMap
-      mapContainerStyle={{ width: '100%', height, borderRadius: 12 }}
-      center={center}
-      zoom={4}
-      options={{ styles: MAP_STYLES, mapTypeId: 'terrain' }}
-      onLoad={map => { mapRef.current = map }}
-    >
-      {validListings.map(listing => (
-        <Marker
-          key={listing.id}
-          position={{ lat: Number(listing.dest_lat), lng: Number(listing.dest_lng) }}
-          title={`${listing.title} — ${listing.destination}`}
-          onClick={() => onSelectListing?.(listing.id)}
-          icon={{
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: RANK_COLORS[listing.creator_rank] || '#888',
-            fillOpacity: 0.9,
-            strokeColor: '#fff',
-            strokeWeight: 2,
-          }}
-        />
-      ))}
-    </GoogleMap>
+    <div style={{ position: 'relative', width: '100%', height }}>
+      <SearchOverlay onSearch={handleSearchLoc} />
+      <GoogleMap
+        mapContainerStyle={{ width: '100%', height: '100%', borderRadius: 12 }}
+        center={center}
+        zoom={4}
+        options={{ styles: MAP_STYLES, mapTypeId: 'terrain' }}
+        onLoad={map => { mapRef.current = map }}
+      >
+        {validListings.map(listing => (
+          <Marker
+            key={listing.id}
+            position={{ lat: Number(listing.dest_lat), lng: Number(listing.dest_lng) }}
+            title={`${listing.title} — ${listing.destination}`}
+            onClick={() => onSelectListing?.(listing.id)}
+            icon={{
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: RANK_COLORS[listing.creator_rank] || '#888',
+              fillOpacity: 0.9,
+              strokeColor: '#fff',
+              strokeWeight: 2,
+            }}
+          />
+        ))}
+      </GoogleMap>
+    </div>
   )
 }
 

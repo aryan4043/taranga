@@ -1,13 +1,17 @@
-FROM node:20-slim
-
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-COPY package*.json ./
-
+RUN apk add --no-cache wget
+COPY package.json tsconfig.json ./
 RUN npm install
+COPY src ./src
+RUN npm run build
 
-COPY . .
-
+FROM node:20-alpine AS runner
+WORKDIR /app
+RUN apk add --no-cache wget
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY package.json ./
 EXPOSE 5002
+CMD ["node", "dist/index.js"]
 
-CMD ["npm", "start"]

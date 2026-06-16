@@ -1,44 +1,103 @@
 version: '3.8'
 
+networks:
+  taranga_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
 services:
+
+  # ── DATABASE ─────────────────────────────────
   db:
     image: postgis/postgis:15-3.3
+    container_name: taranga_db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: taranga
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db-init:/docker-entrypoint-initdb.d
+      - ./services/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - taranga_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d taranga"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
+  # ── TREK SERVICE ─────────────────────────────
   trek-service:
-    build: ./services/trek-service
+    build:
+      context: ./services/trek-service
+      dockerfile: Dockerfile
+    container_name: taranga_trek
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://admin:password@db:5432/taranga
+      DATABASE_URL: postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-password}@db:5432/taranga
+      JWT_SECRET: ${JWT_SECRET:-changeme_secret_32chars_minimum}
+      PORT: 5001
     ports:
       - "5001:5001"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      - taranga_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
+  # ── USER SERVICE ─────────────────────────────
   user-service:
-    build: ./services/user-service
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: taranga_user
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://admin:password@db:5432/taranga
+      DATABASE_URL: postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-password}@db:5432/taranga
+      JWT_SECRET: ${JWT_SECRET:-changeme_secret_32chars_minimum}
+      PORT: 5002
     ports:
       - "5002:5002"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      - taranga_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
+  # ── FRONTEND ─────────────────────────────────
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_TREK_API: http://localhost:5001
+        NEXT_PUBLIC_USER_API: http://localhost:5002
+        NEXT_PUBLIC_MAPS_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    container_name: taranga_frontend
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_TREK_API: http://localhost:5001
       NEXT_PUBLIC_USER_API: http://localhost:5002
-
-volumes:
-  postgres_data:
-
+      NEXT_PUBLIC_MAPS_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    depends_on:
+      - trek-service
+      - user-service
+    networks:
+      - taranga_net
